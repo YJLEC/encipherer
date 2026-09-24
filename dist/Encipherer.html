@@ -760,6 +760,37 @@ html.dark .ec-step-no { color: #0f1318; }
   80% { transform: translateX(5px); }
 }
 
+/* ===== 表头多选弹层 ===== */
+.ec-toolbar { position: relative; }
+.ec-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  min-width: 320px;
+  max-width: 440px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--ec-card, #fff);
+  border: 1px solid var(--ec-line, #d8e0dc);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  padding: 10px 12px;
+}
+.ec-pop-title { font-size: 12px; color: var(--ec-muted, #78909c); margin-bottom: 8px; }
+.ec-pop-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 6px; cursor: pointer;
+  font-size: 13px;
+}
+.ec-pop-row:hover { background: rgba(26, 127, 90, 0.08); }
+.ec-pop-rowno { min-width: 46px; font-weight: 600; }
+.ec-pop-preview {
+  color: var(--ec-muted, #78909c);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;
+}
+.ec-pop-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
 
 /* ===== src/css/grid.css ===== */
 /* ============================================================
@@ -1052,7 +1083,7 @@ html.dark .ec-step-no { color: #0f1318; }
 <noscript><div style="padding:40px;font-family:sans-serif;color:#c0392b">Encipherer 需要 JavaScript 支持,请更换浏览器。</div></noscript>
 <script>
 /* ===== 元信息 ===== */
-window.__EC_BUILD__ = { version: '1.1.0', time: '2026-09-24 04:15:03 UTC' };
+window.__EC_BUILD__ = { version: '1.2.0', time: '2026-09-24 06:01:05 UTC' };
 </script>
 <script>
 /* ===== 浏览器环境垫片(必须先于内联依赖执行)=====
@@ -4848,44 +4879,133 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     unwatchScroll: null
   };
 
-  /* ================= 表头行 ================= */
-  // 当前文件+sheet 的表头行(0 基);null 表示无表头(所有行都参与处理)
-  function headerRowOf(fid, sheetIdx) {
+  /* ================= 表头行(支持多行) ================= */
+  // st.headers[fid:sheetIdx] = 'auto' | [0基行号数组]([] = 无表头)
+  // 兼容旧值:'none' → [],单个数字 → [n]
+  function normHeaderMode(v) {
+    if (v === 'auto' || v === undefined) return 'auto';
+    if (v === 'none' || v === null) return [];
+    if (typeof v === 'number') return [v];
+    if (Array.isArray(v)) return v.slice().sort(function (a, b) { return a - b; });
+    return 'auto';
+  }
+  // 当前文件+sheet 的表头行集合(0 基数组;空数组 = 无表头,所有行参与处理)
+  function headerRowsOf(fid, sheetIdx) {
     var en = st.files.filter(function (e) { return e.wb.id === fid; })[0];
     var sheet = en && en.wb.sheets[sheetIdx];
-    if (!sheet) return null;
-    var mode = st.headers[fid + ':' + sheetIdx];
-    if (mode === undefined || mode === 'auto') {
-      return util.detectHeaderRow(sheet.rows).row;
+    if (!sheet) return [];
+    var mode = normHeaderMode(st.headers[fid + ':' + sheetIdx]);
+    if (mode === 'auto') {
+      var r = util.detectHeaderRow(sheet.rows).row;
+      return r === null ? [] : [r];
     }
-    if (mode === 'none') return null;
     return mode;
   }
-  function activeHeaderRow() {
+  function activeHeaderRows() {
     var en = activeFile();
-    return en ? headerRowOf(en.wb.id, st.activeSheet) : null;
+    return en ? headerRowsOf(en.wb.id, st.activeSheet) : [];
   }
-  // 重建表头行下拉(文件/sheet 切换或数据变化时调用)
+  function activeHeaderSet() {
+    var m = {};
+    activeHeaderRows().forEach(function (r) { m[r] = 1; });
+    return m;
+  }
+  // 表头集合 → 按钮文案:「自动(第1行)」「第1-2行」「第1、3行」「无」
+  function headerRowsLabel(rows, isAuto) {
+    if (!rows.length) return isAuto ? '表头:自动(未识别)' : '表头:无';
+    var parts = [], run = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (run !== null && rows[i] === run.to + 1) { run.to = rows[i]; continue; }
+      if (run !== null) parts.push(run);
+      run = { from: rows[i], to: rows[i] };
+    }
+    if (run !== null) parts.push(run);
+    var s = parts.map(function (p) {
+      return p.from === p.to ? '第' + (p.from + 1) + '行' : '第' + (p.from + 1) + '-' + (p.to + 1) + '行';
+    }).join('、');
+    return (isAuto ? '表头:自动·' : '表头:') + s;
+  }
+  // 表头选择按钮 + 复选弹层(文件/sheet 切换时刷新)
   function rebuildHeaderSel() {
-    if (!st.els.headerSel) return;
+    var btn = st.els.headerBtn;
+    if (!btn) return;
     var en = activeFile();
-    st.els.headerSel.textContent = '';
-    if (!en) { st.els.headerSel.style.display = 'none'; return; }
-    st.els.headerSel.style.display = '';
+    btn.style.display = en ? '' : 'none';
+    if (!en) { closeHeaderPop(); return; }
     var key = en.wb.id + ':' + st.activeSheet;
-    var cur = st.headers[key] === undefined ? 'auto' : st.headers[key];
+    var stored = st.headers[key];
+    var rows = headerRowsOf(en.wb.id, st.activeSheet);
+    var isAuto = stored === undefined || stored === 'auto';
+    btn.textContent = '🧭 ' + headerRowsLabel(rows, isAuto);
+    btn.title = '表头行(勾选的行不参与脱敏,支持多行)';
+    closeHeaderPop();
+  }
+  function closeHeaderPop() {
+    if (st.els.headerPop) { st.els.headerPop.style.display = 'none'; }
+  }
+  function toggleHeaderPop() {
+    var en = activeFile();
+    if (!en) return;
+    var pop = st.els.headerPop;
+    if (!pop) return;
+    if (pop.style.display === 'block') { pop.style.display = 'none'; return; }
+    // 重建弹层内容
+    pop.textContent = '';
+    var key = en.wb.id + ':' + st.activeSheet;
     var sheet = en.wb.sheets[st.activeSheet] || { rows: [] };
-    var autoRow = util.detectHeaderRow(sheet.rows).row;
-    var opts = [
-      { v: 'auto', t: '表头:自动' + (autoRow !== null ? '(第' + (autoRow + 1) + '行)' : '(未识别)') },
-      { v: 'none', t: '表头:无' }
-    ];
+    var stored = st.headers[key];
+    var isAuto = stored === undefined || stored === 'auto';
+    var checked = {};
+    headerRowsOf(en.wb.id, st.activeSheet).forEach(function (r) { checked[r] = 1; });
+    var dirty = false;
     var maxRow = Math.min(10, sheet.rows.length);
-    for (var i = 0; i < maxRow; i++) opts.push({ v: String(i), t: '表头:第' + (i + 1) + '行' });
-    opts.forEach(function (o) {
-      st.els.headerSel.appendChild(util.el('option', { value: o.v, text: o.t }));
+    pop.appendChild(util.el('div', { class: 'ec-pop-title', text: '勾选表头行(可多选,不参与脱敏)' }));
+    for (var i = 0; i < maxRow; i++) {
+      (function (ri) {
+        var row = sheet.rows[ri] || [];
+        var preview = [];
+        for (var c = 0; c < row.length && preview.length < 3; c++) {
+          var t = excel.cellText(row[c]);
+          if (t && t.trim()) preview.push(t.trim().slice(0, 10));
+        }
+        var cb = util.el('input', { type: 'checkbox' });
+        cb.checked = !!checked[ri];
+        cb.addEventListener('change', function () {
+          dirty = true;
+          checked[ri] = cb.checked ? 1 : 0;
+        });
+        pop.appendChild(util.el('label', { class: 'ec-pop-row' }, [
+          cb,
+          util.el('span', { class: 'ec-pop-rowno', text: '第' + (ri + 1) + '行' }),
+          util.el('span', { class: 'ec-pop-preview', text: preview.join('  ') || '(空行)' })
+        ]));
+      })(i);
+    }
+    var autoBtn = util.el('button', { class: 'btn btn-sm', type: 'button', text: '自动识别' });
+    autoBtn.addEventListener('click', function () {
+      st.headers[key] = 'auto';
+      dirty = false;
+      rebuildHeaderSel();
+      refreshOverlays();
+      refreshTip();
+      pop.style.display = 'none';
+      util.toast('已恢复自动识别表头', 'info');
     });
-    st.els.headerSel.value = String(cur);
+    var okBtn = util.el('button', { class: 'btn btn-sm btn-primary', type: 'button', text: '确定' });
+    okBtn.addEventListener('click', function () {
+      if (dirty) {
+        var rows = [];
+        for (var r = 0; r < maxRow; r++) if (checked[r]) rows.push(r);
+        st.headers[key] = rows;
+        util.toast(rows.length ? '已设表头:' + headerRowsLabel(rows, false) + ',这些行不参与脱敏' : '已设为无表头,所有行参与脱敏', 'info');
+        rebuildHeaderSel();
+        refreshOverlays();
+        refreshTip();
+      }
+      pop.style.display = 'none';
+    });
+    pop.appendChild(util.el('div', { class: 'ec-pop-btns' }, [autoBtn, okBtn]));
+    pop.style.display = 'block';
   }
 
   /* ================= 小工具 ================= */
@@ -5236,14 +5356,19 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var out = [];
     var rows = sheet.rows;
     var en = activeFile();
-    var hr = en ? headerRowOf(en.wb.id, st.activeSheet) : null;
+    var hrArr = en ? headerRowsOf(en.wb.id, st.activeSheet) : [];
+    var hrSet = {};
+    hrArr.forEach(function (r) { hrSet[r] = 1; });
     for (var c = 0; c < sheet.maxCols; c++) {
       // ① 表头关键词命中 → 直接给类型建议(显示"表头"徽标)
-      var headerText = hr != null ? excel.cellText((rows[hr] || [])[c]) : '';
+      var headerText = '';
+      for (var hi = 0; hi < hrArr.length && !headerText; hi++) {
+        headerText = excel.cellText((rows[hrArr[hi]] || [])[c]);
+      }
       var headerType = headerText ? fakery.typeFromHeader(headerText) : null;
       var sampled = 0, strong = {}, weak = { name: 0, address: 0, studentid: 0 };
       for (var r = 0; r < rows.length; r++) {
-        if (r === hr) continue; // 表头行不计入采样
+        if (hrSet[r]) continue; // 表头行不计入采样
         var row = rows[r] || [];
         var text = excel.cellText(row[c]);
         if (!text || !text.trim()) continue;
@@ -5342,11 +5467,11 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var tints = {};
     if (rules.length) {
       var rows = sheet.rows;
-      var hr = activeHeaderRow();
+      var hrSet = activeHeaderSet();
       var n = 0;
       outer:
       for (var r = Math.max(0, rng.r0); r <= rng.r1 && r < rows.length; r++) {
-        if (r === hr) continue; // 表头行不参与
+        if (hrSet[r]) continue; // 表头行不参与
         var row = rows[r] || [];
         for (var c = Math.max(0, rng.c0); c <= rng.c1 && c < sheet.maxCols; c++) {
           var rule = firstHitRule(rules, r, c);
@@ -5380,12 +5505,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     if (!rules.length) { st.grid.setPreview(prev); return; }
     var rng = visibleRange() || { r0: 0, r1: 40, c0: 0, c1: 20 };
     var rows = sheet.rows;
-    var hr = activeHeaderRow();
+    var hrSet = activeHeaderSet();
     var n = 0;
     try {
       outer:
       for (var r = Math.max(0, rng.r0); r <= rng.r1 && r < rows.length; r++) {
-        if (r === hr) continue; // 表头行不参与
+        if (hrSet[r]) continue; // 表头行不参与
         var row = rows[r] || [];
         for (var c = Math.max(0, rng.c0); c <= rng.c1 && c < sheet.maxCols; c++) {
           var rule = firstHitRule(rules, r, c);
@@ -5530,15 +5655,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           if (!sheet) continue;
           var rows = sheet.rows;
           var t = rule.target;
-          var hr = headerRowOf(wb.id, rule.sheet); // 表头行不参与脱敏
+          var hrList = headerRowsOf(wb.id, rule.sheet); // 表头行(可多行)不参与脱敏
+          var hrSet = {};
+          hrList.forEach(function (x) { hrSet[x] = 1; });
+          var firstData = hrList.length ? hrList[hrList.length - 1] + 1 : 0;
           var r1, r2, c1, c2;
-          if (t.kind === 'col') { r1 = hr != null ? hr + 1 : 0; r2 = rows.length - 1; c1 = t.c; c2 = t.c; }
+          if (t.kind === 'col') { r1 = firstData; r2 = rows.length - 1; c1 = t.c; c2 = t.c; }
           else { r1 = t.r1; r2 = Math.min(t.r2, rows.length - 1); c1 = t.c1; c2 = Math.min(t.c2, sheet.maxCols - 1); }
           var lastC2 = c2; // 列上界(超界自动夹紧)
           if (lastC2 < c1) continue;
 
           for (var r = r1; r <= r2; r++) {
-            if (r === hr) continue; // 表头行(范围规则跨到表头行时跳过)
+            if (hrSet[r]) continue; // 表头行(范围规则跨到表头行时跳过)
             var row = rows[r] || [];
             for (var c = c1; c <= lastC2; c++) {
               processed++;
@@ -5733,16 +5861,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     });
     var clearSelBtn = util.el('button', { class: 'btn', type: 'button', text: '清除选择' });
     clearSelBtn.addEventListener('click', function () { if (st.grid) st.grid.clearSelection(); });
-    // 表头行选择:自动识别 / 无表头 / 指定行(表头行不参与脱敏)
-    st.els.headerSel = util.el('select', { class: 'select', title: '表头行(该行不参与脱敏)' });
-    st.els.headerSel.addEventListener('change', function () {
-      var en = activeFile();
-      if (!en) return;
-      var v = st.els.headerSel.value;
-      st.headers[en.wb.id + ':' + st.activeSheet] = v === 'auto' || v === 'none' ? v : Number(v);
-      util.toast('表头行已更新,该行不再参与脱敏', 'info');
-      refreshOverlays();
-      refreshTip();
+    // 表头行选择:按钮 + 复选弹层(支持多行;勾选行不参与脱敏)
+    st.els.headerBtn = util.el('button', { class: 'btn', type: 'button', text: '🧭 表头:自动' });
+    st.els.headerBtn.addEventListener('click', toggleHeaderPop);
+    st.els.headerPop = util.el('div', { class: 'ec-pop ec-pop-header', style: { display: 'none' } });
+    document.addEventListener('click', function (e) {
+      if (st.els.headerPop && st.els.headerPop.style.display === 'block' &&
+        !st.els.headerPop.contains(e.target) && e.target !== st.els.headerBtn) {
+        closeHeaderPop();
+      }
     });
     rebuildHeaderSel();
     var drawerBtn = util.el('button', { class: 'btn ec-wb-drawer-toggle', type: 'button', text: '📋 规则' });
@@ -5764,7 +5891,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     var mid = util.el('section', { class: 'ec-wb-mid' }, [
       st.els.sheetTabs,
       util.el('div', { class: 'ec-toolbar' }, [
-        st.els.headerSel, st.els.piiSel, applyBtn, scanBtn, st.els.previewBtn, clearSelBtn,
+        st.els.headerBtn, st.els.headerPop, st.els.piiSel, applyBtn, scanBtn, st.els.previewBtn, clearSelBtn,
         util.el('span', { class: 'ec-toolbar-gap' }), drawerBtn
       ]),
       st.els.suggestBar,

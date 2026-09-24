@@ -748,3 +748,34 @@ html.dark .ec-step-no { color: #0f1318; }
   60% { transform: translateX(-5px); }
   80% { transform: translateX(5px); }
 }
+
+/* ===== 表头多选弹层 ===== */
+.ec-toolbar { position: relative; }
+.ec-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  min-width: 320px;
+  max-width: 440px;
+  max-height: 320px;
+  overflow: auto;
+  background: var(--ec-card, #fff);
+  border: 1px solid var(--ec-line, #d8e0dc);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  padding: 10px 12px;
+}
+.ec-pop-title { font-size: 12px; color: var(--ec-muted, #78909c); margin-bottom: 8px; }
+.ec-pop-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 6px; cursor: pointer;
+  font-size: 13px;
+}
+.ec-pop-row:hover { background: rgba(26, 127, 90, 0.08); }
+.ec-pop-rowno { min-width: 46px; font-weight: 600; }
+.ec-pop-preview {
+  color: var(--ec-muted, #78909c);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;
+}
+.ec-pop-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }

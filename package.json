@@ -1,6 +1,6 @@
 {
   "name": "encipherer",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Encipherer 表格隐私卫士 — 离线单文件表格脱敏/还原工具(隐私优先,零网络)",
   "private": true,
   "main": "electron/main.js",
