@@ -1,0 +1,281 @@
+/* ============================================================
+ * Encipherer 表格组件样式(前缀 eg-)
+ * 配套 src/js/ui/grid.js。深色模式:html.dark(documentElement
+ * 上 class="dark")自动切换 CSS 变量,无需 JS 参与。
+ * 关键变量:--eg-bg / --eg-fg / --eg-line / --eg-head-bg / --eg-sel
+ * ============================================================ */
+
+.eg-grid, .eg-grid * { box-sizing: border-box; }
+
+.eg-grid {
+  --eg-bg: #ffffff;
+  --eg-fg: #1f2328;
+  --eg-line: #e5e7eb;
+  --eg-head-bg: #f6f8fa;
+  --eg-head-fg: #57606a;
+  --eg-head-hover: #e9edf1;
+  --eg-sel: rgba(9, 105, 218, 0.13);
+  --eg-sel-brd: rgba(9, 105, 218, 0.5);
+  --eg-active-brd: #0969da;
+  --eg-zebra: rgba(31, 35, 40, 0.03);
+  --eg-cur: #e8effc;
+  --eg-dot: #e5484d;
+  --eg-warn: #9a6700;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 140px;
+  min-width: 220px;
+  background: var(--eg-bg);
+  color: var(--eg-fg);
+  font: 12px/1.45 "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  overflow: hidden;
+  border: 1px solid var(--eg-line);
+  border-radius: 6px;
+}
+
+/* 深色模式(documentElement class="dark") */
+:root.dark .eg-grid {
+  --eg-bg: #0d1117;
+  --eg-fg: #e6edf3;
+  --eg-line: #30363d;
+  --eg-head-bg: #161b22;
+  --eg-head-fg: #8b949e;
+  --eg-head-hover: #20262d;
+  --eg-sel: rgba(88, 166, 255, 0.16);
+  --eg-sel-brd: rgba(88, 166, 255, 0.55);
+  --eg-active-brd: #58a6ff;
+  --eg-zebra: rgba(230, 237, 243, 0.03);
+  --eg-cur: #1c2440;
+  --eg-dot: #f85149;
+  --eg-warn: #d29922;
+}
+
+/* ---------- 滚动视口 ---------- */
+.eg-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  background: var(--eg-bg);
+}
+.eg-body::-webkit-scrollbar { width: 10px; height: 10px; }
+.eg-body::-webkit-scrollbar-thumb {
+  background: rgba(127, 127, 127, 0.35);
+  border: 2px solid transparent;
+  border-radius: 5px;
+  background-clip: content-box;
+}
+.eg-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(127, 127, 127, 0.55);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.eg-body::-webkit-scrollbar-corner { background: transparent; }
+
+/* 画布(内容坐标系;宽高由 JS 按行列数设定) */
+.eg-canvas { position: relative; }
+
+/* ---------- 表头行(sticky 顶) ---------- */
+/* z 序说明:hrow(5)> rheadcol(4)> activebox(3)> selbox(2)> cell(1)。
+   纵向滚动时行号头上滑应被列头行盖住,横向滚动时单元格应被行号列盖住。 */
+.eg-hrow {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  height: 26px;
+  background: var(--eg-head-bg);
+  border-bottom: 1px solid var(--eg-line);
+}
+
+/* 左上角块(sticky 左,嵌在表头行内) */
+.eg-corner {
+  position: sticky;
+  left: 0;
+  z-index: 1; /* 高于兄弟 .eg-colhead(z:auto),滚动时盖住滑入的列头 */
+  display: block;
+  width: 48px;
+  height: 26px;
+  background: var(--eg-head-bg);
+  border-right: 1px solid var(--eg-line);
+  cursor: pointer;
+}
+
+/* 列头(绝对定位于表头行内,left = 48 + c*96) */
+.eg-colhead {
+  position: absolute;
+  top: 0;
+  width: 96px;
+  height: 26px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--eg-head-bg);
+  color: var(--eg-head-fg);
+  border-right: 1px solid var(--eg-line);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.eg-colhead:hover { background: var(--eg-head-hover); }
+.eg-colhead.eg-cur { background: var(--eg-cur); color: var(--eg-fg); }
+.eg-colhead.eg-on { background: var(--eg-sel); box-shadow: inset 0 -2px 0 var(--eg-sel-brd); }
+
+/* 列头徽标(规则标签;颜色由 JS inline style 上色) */
+.eg-cmark {
+  display: inline-block;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 2px;
+  color: #fff;
+  pointer-events: none;
+}
+
+/* ---------- 行号列(sticky 左) ---------- */
+.eg-rheadcol {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  width: 48px;
+  height: calc(100% - 26px); /* 位于表头行下方 */
+  background: var(--eg-head-bg);
+}
+.eg-rowhead {
+  position: absolute;
+  left: 0;
+  width: 48px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--eg-head-bg);
+  color: var(--eg-head-fg);
+  border-right: 1px solid var(--eg-line);
+  border-bottom: 1px solid var(--eg-line);
+  font-size: 11px;
+  cursor: pointer;
+}
+.eg-rowhead:hover { background: var(--eg-head-hover); }
+.eg-rowhead.eg-cur { background: var(--eg-cur); color: var(--eg-fg); }
+.eg-rowhead.eg-on { background: var(--eg-sel); box-shadow: inset -2px 0 0 var(--eg-sel-brd); }
+
+/* ---------- 数据格 ---------- */
+.eg-cell {
+  position: absolute;
+  z-index: 1;
+  width: 96px;
+  height: 26px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  background: var(--eg-bg);
+  border-right: 1px solid var(--eg-line);
+  border-bottom: 1px solid var(--eg-line);
+}
+.eg-cell.eg-zebra { background: var(--eg-zebra); }
+.eg-cell .eg-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* 溢出省略号 */
+}
+/* 数字右对齐 */
+.eg-cell.eg-num .eg-t { text-align: right; font-variant-numeric: tabular-nums; }
+.eg-cell.eg-tint { cursor: help; }
+
+/* 检测命中:类型角标(右上小三角,颜色由 JS inline 上色) */
+.eg-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+  display: none;
+  pointer-events: none;
+}
+
+/* 预览红点(替换后文本放在 title 悬浮提示) */
+.eg-pdot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--eg-dot);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
+  display: none;
+  pointer-events: none;
+}
+
+/* ---------- 选区覆盖层(内容坐标系,随原生滚动移动) ---------- */
+.eg-selbox {
+  position: absolute;
+  z-index: 2;
+  background: var(--eg-sel);
+  border: 1px solid var(--eg-sel-brd);
+  pointer-events: none;
+}
+
+/* 活动格粗边框 */
+.eg-activebox {
+  position: absolute;
+  z-index: 3;
+  width: 96px;
+  height: 26px;
+  border: 2px solid var(--eg-active-brd);
+  display: none;
+  pointer-events: none;
+}
+
+/* ---------- 空态 ---------- */
+.eg-empty {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--eg-head-fg);
+  pointer-events: none;
+}
+.eg-grid.eg-empty-mode .eg-empty { display: flex; }
+
+/* ---------- 底部状态条 ---------- */
+.eg-status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 10px;
+  background: var(--eg-head-bg);
+  color: var(--eg-head-fg);
+  border-top: 1px solid var(--eg-line);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.eg-status-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.eg-status-item.eg-st-addr { flex: none; font-weight: 600; color: var(--eg-fg); }
+.eg-status-item.eg-st-dims { flex: none; }
+.eg-status-item.eg-st-sel { flex: 1 1 auto; }
+.eg-status-item.eg-st-trunc { flex: none; margin-left: auto; color: var(--eg-warn); font-weight: 600; }

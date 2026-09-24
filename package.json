@@ -1,0 +1,45 @@
+{
+  "name": "encipherer",
+  "version": "1.1.0",
+  "description": "Encipherer 表格隐私卫士 — 离线单文件表格脱敏/还原工具(隐私优先,零网络)",
+  "private": true,
+  "main": "electron/main.js",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "scripts": {
+    "build": "node build/build.js",
+    "test": "node --test tests/crypto.test.js tests/fakery.test.js tests/excel.test.js tests/workspace.test.js",
+    "sample": "node samples/make-samples.mjs",
+    "start:electron": "electron .",
+    "dist:win": "electron-builder --win portable nsis --x64",
+    "dist:mac": "electron-builder --mac dmg zip",
+    "dist:linux": "electron-builder --linux AppImage deb"
+  },
+  "build": {
+    "appId": "com.encipherer.app",
+    "productName": "Encipherer",
+    "copyright": "Copyright © 2026",
+    "directories": { "output": "release" },
+    "files": ["electron/**", "dist/Encipherer.html", "package.json"],
+    "win": {
+      "target": [
+        { "target": "portable", "arch": ["x64"] },
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "portable": { "artifactName": "Encipherer-便携版-${version}.exe" },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "artifactName": "Encipherer-安装包-${version}.exe"
+    },
+    "mac": { "target": ["dmg", "zip"], "category": "public.app-category.utilities" },
+    "linux": { "target": ["AppImage", "deb"], "category": "Utility" }
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
