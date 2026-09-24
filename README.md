@@ -29,7 +29,7 @@ Encipherer 是一个**完全离线**运行的表格脱敏/还原工具。它把�
 |---|---|---|
 | **① 单文件版(推荐)** | `dist/Encipherer.html`(约 2.1 MB,全部代码与依赖内嵌这一个文件) | 任意现代浏览器(Windows/macOS/Linux),双击即用、随 U 盘携带、可整体审计 |
 | **② 在线版** | 自行部署:`web/index.html` 放到任意静态托管(GitHub Pages / Cloudflare Pages,见 [docs/Web部署.md](docs/Web部署.md)) | 发个链接就能用;HTTPS 源下浏览器存储完整可用 |
-| **③ Windows 桌面版** | `release/` 下的便携版 exe(约 71 MB,免安装,见 [docs/打包指南.md](docs/打包指南.md)) | 不依赖浏览器、存储不受 `file://` 限制,适合日常重度使用 |
+| **③ Windows 桌面版** | [GitHub Releases](https://github.com/YJLEC/encipherer/releases/latest) 下载 `portable`(便携,免安装)/ `setup`(安装向导)exe,约 71 MB | 不依赖浏览器、存储不受 `file://` 限制,适合日常重度使用 |
 | **④ macOS / Linux 桌面版** | 需在对应系统上执行 `npm run dist:mac` / `dist:linux` 打包(见 [docs/打包指南.md](docs/打包指南.md)) | mac dmg/zip、Linux AppImage/deb |
 
 > 单文件版在 `file://` 协议下浏览器会限制本地存储,应用会自动降级(localStorage 或纯内存)——重要工作请及时**导出 `.ecw` 文件**,或改用桌面版。
