@@ -92,3 +92,7 @@ npm run dist:win   # 打包 Windows 便携版 + NSIS 安装包(产物在 release
 ## 许可
 
 私有项目,未设开源许可证;内置第三方库 SheetJS(Apache-2.0)与 ExcelJS(MIT)随单文件分发。
+
+## 许可证
+
+[MIT](LICENSE) — 可自由使用、修改与分发。第三方依赖:SheetJS(Apache-2.0)、ExcelJS(MIT),均以原始形式内嵌于 `vendor/`。
